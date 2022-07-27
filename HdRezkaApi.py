@@ -3,322 +3,340 @@ from bs4 import BeautifulSoup
 import base64
 from itertools import product
 
+domain = open("domain.txt", "r").read()
+
+
 class HdRezkaStreamSubtitles():
-	def __init__(self, data, codes):
-		self.subtitles = {}
-		self.keys = []
-		if data:
-			arr = data.split(",")
-			for i in arr:
-				temp = i.split("[")[1].split("]")
-				lang = temp[0]
-				link = temp[1]
-				code = codes[lang]
-				self.subtitles[code] = {'title': lang, 'link': link}
-			self.keys = list(self.subtitles.keys())
-	def __str__(self):
-		return str(self.keys)
-	def __call__(self, id=None):
-		if self.subtitles:
-			if id:
-				if id in self.subtitles.keys():
-					return self.subtitles[id]['link']
-				for key, value in self.subtitles.items():
-					if value['title'] == id:
-						return self.subtitles[key]['link']
-				if str(id).isnumeric:
-					code = list(self.subtitles.keys())[id]
-					return self.subtitles[code]['link']
-				raise ValueError(f'Subtitles "{id}" is not defined')
-			else:
-				return None
+    def __init__(self, data, codes):
+        self.subtitles = {}
+        self.keys = []
+        if data:
+            arr = data.split(",")
+            for i in arr:
+                temp = i.split("[")[1].split("]")
+                lang = temp[0]
+                link = temp[1]
+                code = codes[lang]
+                self.subtitles[code] = {'title': lang, 'link': link}
+            self.keys = list(self.subtitles.keys())
+
+    def __str__(self):
+        return str(self.keys)
+
+    def __call__(self, id=None):
+        if self.subtitles:
+            if id:
+                if id in self.subtitles.keys():
+                    return self.subtitles[id]['link']
+                for key, value in self.subtitles.items():
+                    if value['title'] == id:
+                        return self.subtitles[key]['link']
+                if str(id).isnumeric:
+                    code = list(self.subtitles.keys())[id]
+                    return self.subtitles[code]['link']
+                raise ValueError(f'Subtitles "{id}" is not defined')
+            else:
+                return None
+
 
 class HdRezkaStream():
-	def __init__(self, season, episode, subtitles={}):
-		self.videos = {}
-		self.season = season
-		self.episode = episode
-		self.subtitles = HdRezkaStreamSubtitles(**subtitles)
-	def append(self, resolution, link):
-		self.videos[resolution] = link
-	def __str__(self):
-		resolutions = list(self.videos.keys())
-		if self.subtitles.subtitles:
-			return f"<HdRezkaStream> : {resolutions}, subtitles={self.subtitles}"
-		return "<HdRezkaStream> : " + str(resolutions)
-	def __repr__(self):
-		return f"<HdRezkaStream(season:{self.season}, episode:{self.episode})>"
-	def __call__(self, resolution):
-		coincidences = list(filter(lambda x: str(resolution) in x , self.videos))
-		if len(coincidences) > 0:
-			return self.videos[coincidences[0]]
-		raise ValueError(f'Resolution "{resolution}" is not defined')
+    def __init__(self, season, episode, subtitles={}):
+        self.videos = {}
+        self.season = season
+        self.episode = episode
+        self.subtitles = HdRezkaStreamSubtitles(**subtitles)
+
+    def append(self, resolution, link):
+        self.videos[resolution] = link
+
+    def __str__(self):
+        resolutions = list(self.videos.keys())
+        if self.subtitles.subtitles:
+            return f"<HdRezkaStream> : {resolutions}, subtitles={self.subtitles}"
+        return "<HdRezkaStream> : " + str(resolutions)
+
+    def __repr__(self):
+        return f"<HdRezkaStream(season:{self.season}, episode:{self.episode})>"
+
+    def __call__(self, resolution):
+        coincidences = list(filter(lambda x: str(resolution) in x, self.videos))
+        if len(coincidences) > 0:
+            return self.videos[coincidences[0]]
+        raise ValueError(f'Resolution "{resolution}" is not defined')
 
 
 class HdRezkaApi():
-	__version__ = 4.0
-	def __init__(self, url):
-		self.HEADERS = {'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36'}
-		self.url = url.split(".html")[0] + ".html"
-		self.page = self.getPage()
-		self.soup = self.getSoup()
-		self.id = self.extractId()
-		self.name = self.getName()
-		self.type = self.getType()
+    __version__ = 4.0
 
-		#other
-		self.translators = None
-		self.seriesInfo = None
+    def __init__(self, url):
+        self.HEADERS = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36'}
+        self.url = url.split(".html")[0] + ".html"
+        self.page = self.getPage()
+        self.soup = self.getSoup()
+        self.id = self.extractId()
+        self.name = self.getName()
+        self.type = self.getType()
+        self.domain = self.getDomain()
 
-	def getPage(self):
-		return requests.get(self.url, headers=self.HEADERS)
+        # other
+        self.translators = None
+        self.seriesInfo = None
 
-	def getSoup(self):
-		return BeautifulSoup(self.page.content, 'html.parser')
+    def getPage(self):
+        return requests.get(self.url, headers=self.HEADERS)
 
-	def extractId(self):
-		return self.soup.find(id="post_id").attrs['value']
+    def getSoup(self):
+        return BeautifulSoup(self.page.content, 'html.parser')
 
-	def getName(self):
-		return self.soup.find(class_="b-post__title").get_text().strip()
+    def extractId(self):
+        return self.soup.find(id="post_id").attrs['value']
 
-	def getType(self):
-		return self.soup.find('meta', property="og:type").attrs['content']
+    def getName(self):
+        return self.soup.find(class_="b-post__title").get_text().strip()
 
-	@staticmethod
-	def clearTrash(data):
-		trashList = ["@","#","!","^","$"]
-		trashCodesSet = []
-		for i in range(2,4):
-			startchar = ''
-			for chars in product(trashList, repeat=i):
-				data_bytes = startchar.join(chars).encode("utf-8")
-				trashcombo = base64.b64encode(data_bytes)
-				trashCodesSet.append(trashcombo)
+    def getType(self):
+        return self.soup.find('meta', property="og:type").attrs['content']
 
-		arr = data.replace("#h", "").split("//_//")
-		trashString = ''.join(arr)
+    def getDomain(self):
+        domain = str()
+        for i in url:
+            if domain.count('/') == 3:
+                break
+            domain += i
+        return domain
 
-		for i in trashCodesSet:
-			temp = i.decode("utf-8")
-			trashString = trashString.replace(temp, '')
+    @staticmethod
+    def clearTrash(data):
+        trashList = ["@", "#", "!", "^", "$"]
+        trashCodesSet = []
+        for i in range(2, 4):
+            startchar = ''
+            for chars in product(trashList, repeat=i):
+                data_bytes = startchar.join(chars).encode("utf-8")
+                trashcombo = base64.b64encode(data_bytes)
+                trashCodesSet.append(trashcombo)
 
-		finalString = base64.b64decode(trashString+"==")
-		return finalString.decode("utf-8")
+        arr = data.replace("#h", "").split("//_//")
+        trashString = ''.join(arr)
 
-	def getTranslations(self):
-		arr = {}
-		translators = self.soup.find(id="translators-list")
-		if translators:
-			children = translators.findChildren(recursive=False)
-			for child in children:
-				if child.text:
-					arr[child.text] = child.attrs['data-translator_id']
+        for i in trashCodesSet:
+            temp = i.decode("utf-8")
+            trashString = trashString.replace(temp, '')
 
-		if not arr:
-			#auto-detect
-			def getTranslationName(s):
-				table = s.find(class_="b-post__info")
-				for i in table.findAll("tr"):
-					tmp = i.get_text()
-					if tmp.find("переводе") > 0:
-						return tmp.split("В переводе:")[-1].strip()
-			def getTranslationID(s):
-				initCDNEvents = {'video.tv_series': 'initCDNSeriesEvents',
-								 'video.movie'    : 'initCDNMoviesEvents'}
-				tmp = s.text.split(f"sof.tv.{initCDNEvents[self.type]}")[-1].split("{")[0]
-				return tmp.split(",")[1].strip()
+        finalString = base64.b64decode(trashString + "==")
+        return finalString.decode("utf-8")
 
-			arr[getTranslationName(self.soup)] = getTranslationID(self.page)
+    def getTranslations(self):
+        arr = {}
+        translators = self.soup.find(id="translators-list")
+        if translators:
+            children = translators.findChildren(recursive=False)
+            for child in children:
+                if child.text:
+                    arr[child.text] = child.attrs['data-translator_id']
 
-		self.translators = arr
-		return arr
+        if not arr:
+            # auto-detect
+            def getTranslationName(s):
+                table = s.find(class_="b-post__info")
+                for i in table.findAll("tr"):
+                    tmp = i.get_text()
+                    if tmp.find("переводе") > 0:
+                        return tmp.split("В переводе:")[-1].strip()
 
-	def getOtherParts(self):
-		parts = self.soup.find(class_="b-post__partcontent")
-		other = []
-		if parts:
-			for i in parts.findAll(class_="b-post__partcontent_item"):
-				if 'current' in i.attrs['class']:
-					other.append({
-						i.find(class_="title").text: self.url
-					})
-				else:
-					other.append({
-						i.find(class_="title").text: i.attrs['data-url']
-					})
-		return other
+            def getTranslationID(s):
+                initCDNEvents = {'video.tv_series': 'initCDNSeriesEvents',
+                                 'video.movie': 'initCDNMoviesEvents'}
+                tmp = s.text.split(f"sof.tv.{initCDNEvents[self.type]}")[-1].split("{")[0]
+                return tmp.split(",")[1].strip()
 
-	@staticmethod
-	def getEpisodes(s, e):
-		seasons = BeautifulSoup(s, 'html.parser')
-		episodes = BeautifulSoup(e, 'html.parser')
+            arr[getTranslationName(self.soup)] = getTranslationID(self.page)
 
-		seasons_ = {}
-		for season in seasons.findAll(class_="b-simple_season__item"):
-			seasons_[ season.attrs['data-tab_id'] ] = season.text
+        self.translators = arr
+        return arr
 
-		episods = {}
-		for episode in episodes.findAll(class_="b-simple_episode__item"):
-			if episode.attrs['data-season_id'] in episods:
-				episods[episode.attrs['data-season_id']] [ episode.attrs['data-episode_id'] ] = episode.text
-			else:
-				episods[episode.attrs['data-season_id']] = {episode.attrs['data-episode_id']: episode.text}
+    def getOtherParts(self):
+        parts = self.soup.find(class_="b-post__partcontent")
+        other = []
+        if parts:
+            for i in parts.findAll(class_="b-post__partcontent_item"):
+                if 'current' in i.attrs['class']:
+                    other.append({
+                        i.find(class_="title").text: self.url
+                    })
+                else:
+                    other.append({
+                        i.find(class_="title").text: i.attrs['data-url']
+                    })
+        return other
 
-		return seasons_, episods
+    @staticmethod
+    def getEpisodes(s, e):
+        seasons = BeautifulSoup(s, 'html.parser')
+        episodes = BeautifulSoup(e, 'html.parser')
 
-	def getSeasons(self):
-		if not self.translators:
-			self.translators = self.getTranslations()
+        seasons_ = {}
+        for season in seasons.findAll(class_="b-simple_season__item"):
+            seasons_[season.attrs['data-tab_id']] = season.text
 
-		arr = {}
-		for i in self.translators:
-			js = {
-				"id": self.id,
-				"translator_id": self.translators[i],
-				"action": "get_episodes"
-			}
-			r = requests.post("https://rezka.ag/ajax/get_cdn_series/", data=js, headers=self.HEADERS)
-			response = r.json()
-			if response['success']:
-				seasons, episodes = self.getEpisodes(response['seasons'], response['episodes'])
-				arr[i] = {
-					"translator_id": self.translators[i],
-					"seasons": seasons, "episodes": episodes
-				}
+        episods = {}
+        for episode in episodes.findAll(class_="b-simple_episode__item"):
+            if episode.attrs['data-season_id'] in episods:
+                episods[episode.attrs['data-season_id']][episode.attrs['data-episode_id']] = episode.text
+            else:
+                episods[episode.attrs['data-season_id']] = {episode.attrs['data-episode_id']: episode.text}
 
-		self.seriesInfo = arr
-		return arr
+        return seasons_, episods
 
-	def getStream(self, season=None, episode=None, translation=None, index=0):
-		def makeRequest(data):
-			r = requests.post("https://rezka.ag/ajax/get_cdn_series/", data=data, headers=self.HEADERS)
-			r = r.json()
-			if r['success']:
-				arr = self.clearTrash(r['url']).split(",")
-				stream = HdRezkaStream( season,
-										episode,
-										subtitles={'data':  r['subtitle'], 'codes': r['subtitle_lns']}
-									  )
-				for i in arr:
-					res = i.split("[")[1].split("]")[0]
-					video = i.split("[")[1].split("]")[1].split(" or ")[1]
-					stream.append(res, video)
-				return stream
+    def getSeasons(self):
+        if not self.translators:
+            self.translators = self.getTranslations()
 
-		def getStreamSeries(self, season, episode, translation_id):
-			if not (season and episode):
-				raise TypeError("getStream() missing required arguments (season and episode)")
-			
-			season = str(season)
-			episode = str(episode)
+        arr = {}
+        for i in self.translators:
+            js = {
+                "id": self.id,
+                "translator_id": self.translators[i],
+                "action": "get_episodes"
+            }
+            r = requests.post(self.domain + "ajax/get_cdn_series/", data=js, headers=self.HEADERS)
+            response = r.json()
+            if response['success']:
+                seasons, episodes = self.getEpisodes(response['seasons'], response['episodes'])
+                arr[i] = {
+                    "translator_id": self.translators[i],
+                    "seasons": seasons, "episodes": episodes
+                }
 
-			if not self.seriesInfo:
-				self.getSeasons()
-			seasons = self.seriesInfo
+        self.seriesInfo = arr
+        return arr
 
-			tr_str = list(self.translators.keys())[list(self.translators.values()).index(translation_id)]
+    def getStream(self, season=None, episode=None, translation=None, index=0):
+        def makeRequest(data):
+            r = requests.post(self.domain + "ajax/get_cdn_series/", data=data, headers=self.HEADERS)
+            r = r.json()
+            if r['success']:
+                arr = self.clearTrash(r['url']).split(",")
+                stream = HdRezkaStream(season,
+                                       episode,
+                                       subtitles={'data': r['subtitle'], 'codes': r['subtitle_lns']}
+                                       )
+                for i in arr:
+                    res = i.split("[")[1].split("]")[0]
+                    video = i.split("[")[1].split("]")[1].split(" or ")[1]
+                    stream.append(res, video)
+                return stream
 
-			if not season in list(seasons[tr_str]['episodes']):
-				raise ValueError(f'Season "{season}" is not defined')
+        def getStreamSeries(self, season, episode, translation_id):
+            if not (season and episode):
+                raise TypeError("getStream() missing required arguments (season and episode)")
 
-			if not episode in list(seasons[tr_str]['episodes'][season]):
-				raise ValueError(f'Episode "{episode}" is not defined')
+            season = str(season)
+            episode = str(episode)
 
-			return makeRequest({
-				"id": self.id,
-				"translator_id": translation_id,
-				"season": season,
-				"episode": episode,
-				"action": "get_stream"
-			})
-			
+            if not self.seriesInfo:
+                self.getSeasons()
+            seasons = self.seriesInfo
 
-		def getStreamMovie(self, translation_id):
-			return makeRequest({
-				"id": self.id,
-				"translator_id": translation_id,
-				"action": "get_movie"
-			})			
+            tr_str = list(self.translators.keys())[list(self.translators.values()).index(translation_id)]
 
+            if not season in list(seasons[tr_str]['episodes']):
+                raise ValueError(f'Season "{season}" is not defined')
 
-		if not self.translators:
-			self.translators = self.getTranslations()
+            if not episode in list(seasons[tr_str]['episodes'][season]):
+                raise ValueError(f'Episode "{episode}" is not defined')
 
-		if translation:
-			if translation.isnumeric():
-				if translation in self.translators.values():
-					tr_id = translation
-				else:
-					raise ValueError(f'Translation with code "{translation}" is not defined')
+            return makeRequest({
+                "id": self.id,
+                "translator_id": translation_id,
+                "season": season,
+                "episode": episode,
+                "action": "get_stream"
+            })
 
-			elif translation in self.translators:
-				tr_id = self.translators[translation]
-			else:
-				raise ValueError(f'Translation "{translation}" is not defined')
+        def getStreamMovie(self, translation_id):
+            return makeRequest({
+                "id": self.id,
+                "translator_id": translation_id,
+                "action": "get_movie"
+            })
 
-		else:
-			tr_id = list(self.translators.values())[index]
+        if not self.translators:
+            self.translators = self.getTranslations()
 
+        if translation:
+            if translation.isnumeric():
+                if translation in self.translators.values():
+                    tr_id = translation
+                else:
+                    raise ValueError(f'Translation with code "{translation}" is not defined')
 
-		if self.type == "video.tv_series":
-			return getStreamSeries(self, season, episode, tr_id)
-		elif self.type == "video.movie":
-			return getStreamMovie(self, tr_id)
-		else:
-			raise TypeError("Undefined content type")
+            elif translation in self.translators:
+                tr_id = self.translators[translation]
+            else:
+                raise ValueError(f'Translation "{translation}" is not defined')
 
+        else:
+            tr_id = list(self.translators.values())[index]
 
-	def getSeasonStreams(self, season, translation=None, index=0, ignore=False, progress=None):
-		season = str(season)
+        if self.type == "video.tv_series":
+            return getStreamSeries(self, season, episode, tr_id)
+        elif self.type == "video.movie":
+            return getStreamMovie(self, tr_id)
+        else:
+            raise TypeError("Undefined content type")
 
-		if not self.translators:
-			self.translators = self.getTranslations()
-		trs = self.translators
+    def getSeasonStreams(self, season, translation=None, index=0, ignore=False, progress=None):
+        season = str(season)
 
-		if translation:
-			if translation.isnumeric():
-				if translation in trs.values():
-					tr_id = translation
-				else:
-					raise ValueError(f'Translation with code "{translation}" is not defined')
+        if not self.translators:
+            self.translators = self.getTranslations()
+        trs = self.translators
 
-			elif translation in trs:
-				tr_id = trs[translation]
-			else:
-				raise ValueError(f'Translation "{translation}" is not defined')
+        if translation:
+            if translation.isnumeric():
+                if translation in trs.values():
+                    tr_id = translation
+                else:
+                    raise ValueError(f'Translation with code "{translation}" is not defined')
 
-		else:
-			tr_id = list(trs.values())[index]
+            elif translation in trs:
+                tr_id = trs[translation]
+            else:
+                raise ValueError(f'Translation "{translation}" is not defined')
 
-		tr_str = list(trs.keys())[list(trs.values()).index(tr_id)]
+        else:
+            tr_id = list(trs.values())[index]
 
-		if not self.seriesInfo:
-			self.getSeasons()
-		seasons = self.seriesInfo
+        tr_str = list(trs.keys())[list(trs.values()).index(tr_id)]
 
-		if not season in list(seasons[tr_str]['episodes']):
-			raise ValueError(f'Season "{season}" is not defined')
+        if not self.seriesInfo:
+            self.getSeasons()
+        seasons = self.seriesInfo
 
-		series = seasons[tr_str]['episodes'][season]
-		streams = {}
+        if not season in list(seasons[tr_str]['episodes']):
+            raise ValueError(f'Season "{season}" is not defined')
 
-		series_length = len(series)
+        series = seasons[tr_str]['episodes'][season]
+        streams = {}
 
-		for episode_id in series:
-			def make_call():
-				stream = self.getStream(season, episode_id, tr_str)
-				streams[episode_id] = stream
-				if progress:
-					progress(episode_id, series_length)
-				else:
-					print(f"> {episode_id}", end="\r")
+        series_length = len(series)
 
-			if ignore:
-				try:
-					make_call()
-				except Exception as e:
-					print(e)
-			else:
-				make_call()
-		return streams
+        for episode_id in series:
+            def make_call():
+                stream = self.getStream(season, episode_id, tr_str)
+                streams[episode_id] = stream
+                if progress:
+                    progress(episode_id, series_length)
+                else:
+                    print(f"> {episode_id}", end="\r")
+
+            if ignore:
+                try:
+                    make_call()
+                except Exception as e:
+                    print(e)
+            else:
+                make_call()
+        return streams
