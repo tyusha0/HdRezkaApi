@@ -3,8 +3,6 @@ from bs4 import BeautifulSoup
 import base64
 from itertools import product
 
-domain = open("domain.txt", "r").read()
-
 
 class HdRezkaStreamSubtitles():
     def __init__(self, data, codes):
@@ -100,7 +98,7 @@ class HdRezkaApi():
 
     def getDomain(self):
         domain = str()
-        for i in url:
+        for i in self.url:
             if domain.count('/') == 3:
                 break
             domain += i
