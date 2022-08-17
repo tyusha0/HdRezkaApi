@@ -97,12 +97,7 @@ class HdRezkaApi():
         return self.soup.find('meta', property="og:type").attrs['content']
 
     def getDomain(self):
-        domain = str()
-        for i in self.url:
-            if domain.count('/') == 3:
-                break
-            domain += i
-        return domain
+        return re.findall(r"(https?://.*?/)", self.url)[0]
 
     @staticmethod
     def clearTrash(data):
