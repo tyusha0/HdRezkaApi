@@ -1,3 +1,4 @@
+import re
 import requests
 from bs4 import BeautifulSoup
 import base64
@@ -101,23 +102,16 @@ class HdRezkaApi():
 
     @staticmethod
     def clearTrash(data):
-        trashList = ["@", "#", "!", "^", "$"]
-        trashCodesSet = []
-        for i in range(2, 4):
-            startchar = ''
-            for chars in product(trashList, repeat=i):
-                data_bytes = startchar.join(chars).encode("utf-8")
-                trashcombo = base64.b64encode(data_bytes)
-                trashCodesSet.append(trashcombo)
-
-        arr = data.replace("#h", "").split("//_//")
-        trashString = ''.join(arr)
-
-        for i in trashCodesSet:
-            temp = i.decode("utf-8")
-            trashString = trashString.replace(temp, '')
-
-        finalString = base64.b64decode(trashString + "==")
+        data = data.replace('#h','')
+        trashList = ['//_//JCQjISFAIyFAIyM=',
+                    '//_//Xl5eIUAjIyEhIyM=',
+                    '//_//IyMjI14hISMjIUBA', 
+                    '//_//QEBAQEAhIyMhXl5e',
+                    '//_//JCQhIUAkJEBeIUAjJCRA']
+        for i in range(3):
+            for t in trashList:
+                data = data.replace(t,'')
+        finalString = base64.b64decode(data) 
         return finalString.decode("utf-8")
 
     def getTranslations(self):
